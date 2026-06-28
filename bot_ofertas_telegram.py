@@ -2,57 +2,60 @@ import requests
 import schedule
 import time
 import threading
-import re
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TELEGRAM_TOKEN = "8859504173:AAGxsKZ5oa_66Pk1_iaTLkD-fm6BIED0hJI"
 TELEGRAM_CANAL = "@ofertasrelampagotech"
 ML_ID_AFILIADO = "cl20260628092446"
+AMAZON_ID_AFILIADO = "caiomakemoney-20"
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "pt-BR,pt;q=0.9",
-}
+PRODUTOS_AMAZON = [
+    "celular samsung",
+    "notebook",
+    "smart tv",
+    "fone bluetooth",
+    "tablet",
+    "ssd",
+    "monitor",
+    "teclado mouse"
+]
 
-def buscar_ofertas_ml():
-    print("[ML] Buscando ofertas do dia...")
+def buscar_amazon(termo, limite=2):
+    print(f"[AMAZON] Buscando: {termo}")
+    url = f"https://www.amazon.com.br/s"
+    params = {"k": termo, "ref": "sr_pg_1"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
     try:
-        r = requests.get("https://www.mercadolivre.com.br/ofertas", headers=HEADERS, timeout=20)
-        print(f"[ML] Status: {r.status_code}")
+        r = requests.get(url, params=params, headers=headers, timeout=20)
+        print(f"[AMAZON] Status: {r.status_code}")
         if r.status_code != 200:
             return []
-        html = r.text
-        # Extrai títulos
-        titulos = re.findall(r'"title":"([^"]{10,80})"', html)
-        # Extrai preços
-        precos = re.findall(r'"price":(\d+\.?\d*)', html)
-        # Extrai preços originais
-        originais = re.findall(r'"original_price":(\d+\.?\d*)', html)
-        # Extrai links
-        links = re.findall(r'"permalink":"(https://www\.mercadolivre\.com\.br/[^"]+)"', html)
-        print(f"[ML] Titulos: {len(titulos)} | Precos: {len(precos)} | Links: {len(links)}")
+        import re
+        # Extrai ASINs (IDs de produtos Amazon)
+        asins = re.findall(r'"asin":"([A-Z0-9]{10})"', r.text)
+        titulos = re.findall(r'"title"\s*:\s*"([^"]{10,100})"', r.text)
+        precos = re.findall(r'"price"\s*:\s*"?([\d,\.]+)"?', r.text)
+        print(f"[AMAZON] ASINs: {len(asins)} | Titulos: {len(titulos)}")
         ofertas = []
-        for i in range(min(len(titulos), len(links), 6)):
-            preco = float(precos[i]) if i < len(precos) else 0
-            original = float(originais[i]) if i < len(originais) else 0
-            desconto = round((1 - preco/original) * 100) if original > preco > 0 else 0
+        for i in range(min(len(asins), limite)):
+            asin = asins[i]
+            titulo = titulos[i] if i < len(titulos) else termo
+            preco = precos[i] if i < len(precos) else ""
+            link = f"https://www.amazon.com.br/dp/{asin}?tag={AMAZON_ID_AFILIADO}"
             ofertas.append({
-                "titulo": titulos[i][:60],
+                "titulo": titulo[:60],
                 "preco": preco,
-                "original": original,
-                "desconto": desconto,
-                "link": links[i],
+                "link": link,
             })
         return ofertas
     except Exception as e:
-        print(f"[ML] ERRO: {e}")
+        print(f"[AMAZON] ERRO: {e}")
         return []
-
-def gerar_link(link):
-    sep = "&" if "?" in link else "?"
-    return f"{link}{sep}partner_id={ML_ID_AFILIADO}"
 
 def enviar_telegram(mensagem):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -67,23 +70,22 @@ def enviar_telegram(mensagem):
 
 def postar_ofertas():
     print(f"\n{'='*40}\n[BOT] {datetime.now()}\n{'='*40}")
-    ofertas = buscar_ofertas_ml()
-    if not ofertas:
-        print("[BOT] Nenhuma oferta encontrada!")
-        return
     total = 0
-    for o in ofertas:
-        link = gerar_link(o["link"])
-        msg = f"🔥 {o['titulo']}\n\n"
-        if o["original"] > o["preco"] > 0:
-            msg += f"💸 DE: R$ {o['original']:.2f}\n"
-            msg += f"✅ POR: R$ {o['preco']:.2f}\n"
-        if o["desconto"] > 0:
-            msg += f"📉 {o['desconto']}% OFF\n"
-        msg += f"\n🛒 COMPRAR AGORA:\n{link}\n\n⏰ Promocao por tempo limitado!\n📢 @ofertasrelampagotech"
-        if enviar_telegram(msg):
-            total += 1
-        time.sleep(5)
+    for termo in PRODUTOS_AMAZON[:3]:
+        ofertas = buscar_amazon(termo, limite=1)
+        for o in ofertas:
+            msg = (
+                f"🛒 {o['titulo']}\n\n"
+                f"💰 Preço: R$ {o['preco']}\n\n" if o['preco'] else f"🛒 {o['titulo']}\n\n"
+            )
+            msg += (
+                f"🔗 Ver na Amazon:\n{o['link']}\n\n"
+                f"⏰ Oferta por tempo limitado!\n"
+                f"📢 @ofertasrelampagotech"
+            )
+            if enviar_telegram(msg):
+                total += 1
+            time.sleep(5)
     print(f"[BOT] Total: {total}")
 
 def rodar_bot():
@@ -92,7 +94,7 @@ def rodar_bot():
     enviar_telegram(
         "🔥 CANAL NO AR!\n\nBem-vindo ao Ofertas Relampago Tech!\n\n"
         "📱 Celulares | 💻 Notebooks | 📺 TVs\n\n"
-        "✅ Melhores ofertas do ML todo dia\n"
+        "✅ Melhores ofertas Amazon e ML todo dia\n"
         "✅ Frete Gratis selecionado\n\n"
         "Ative as notificacoes!\n📢 @ofertasrelampagotech"
     )
@@ -119,5 +121,5 @@ if __name__ == "__main__":
     bot_thread = threading.Thread(target=rodar_bot, daemon=True)
     bot_thread.start()
     server = HTTPServer(("0.0.0.0", 10000), Handler)
-    print("[SERVER] Porta 10000 pronta!")
+    print("[SERVER] Porta 10000!")
     server.serve_forever()
