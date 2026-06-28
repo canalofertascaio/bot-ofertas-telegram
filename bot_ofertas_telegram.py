@@ -8,7 +8,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 # ============================================================
 # CONFIGURACOES
 # ============================================================
-TELEGRAM_TOKEN = "8902136006:AAFjEQcnO2VDt99QTLYIroXTdpWKi78ArdM"
+TELEGRAM_TOKEN = "8859504173:AAGxsKZ5oa_66Pk1_iaTLkD-fm6BIED0hJI"
 TELEGRAM_CANAL = "@ofertasrelampagotech"
 ML_ID_AFILIADO = "cl20260628092446"
 
