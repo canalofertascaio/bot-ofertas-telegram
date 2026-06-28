@@ -6,7 +6,7 @@ from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TELEGRAM_TOKEN = "8902136006:AAFjEQcnO2VDt99QTLYIroXTdpWKi78ArdM"
-TELEGRAM_CANAL = "https://t.me/+fiA4XWAeARY2OGIx"
+TELEGRAM_CANAL = "https://t.me/@ofertasrelampagotech"
 ML_ID_AFILIADO = "cl20260628092446"
 
 CATEGORIAS_ML = [
@@ -70,7 +70,7 @@ def formatar_mensagem(produto, categoria):
 
 def enviar_telegram(mensagem):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": "@OfertasRelâmpagoTech", "text": mensagem, "parse_mode": "Markdown"}
+    payload = {"chat_id": "@ofertasrelampagotech", "text": mensagem, "parse_mode": "Markdown"}
     try:
         r = requests.post(url, json=payload, timeout=10)
         r.raise_for_status()
